@@ -8,25 +8,17 @@
 		Loaded="Window_Loaded"
 		Title="GameWindow" Height="1080" Width="1920" Closing="Window_Closing" KeyDown="Window_KeyDown" KeyUp="Window_KeyUp" WindowStyle="None" WindowState="Maximized" WindowStartupLocation="CenterScreen">
 	<Viewbox>
-		<Grid Width="1920" Height="1080" >
-			<Grid x:Name="grd" Width="1920" Height="1080">
-			</Grid>
+		<Grid x:Name="grd" Width="1920" Height="1080" >
+			<Image x:Name="imgBG"/>
 			<Viewbox Width ="1920" Height="1080">
-				<Grid>
-					<Grid x:Name="grdTyreTracks" Width="320" Height="180">
-					</Grid>
-					<Grid x:Name="grdTrack" Width="320" Height="180">
+				<Canvas Width="320" Height="180">
+					<Canvas x:Name="grdTyreTracks" Width="320" Height="180">
+					</Canvas>
+					<Canvas x:Name="grdTrack" Width="320" Height="180">
 						<Image x:Name="imgWrBitmapCars" HorizontalAlignment="Left" Width="320" Height="180" Margin="0,0,0,0" VerticalAlignment="Top"/>
-						<Rectangle x:Name="rctRectP1" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,0,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Red" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP2" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,5,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Orange" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP3" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,10,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Yellow" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP4" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,15,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Green" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP5" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,20,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Blue" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP6" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,25,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Indigo" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-						<Rectangle x:Name="rctRectP7" HorizontalAlignment="Left" Height="3" Width="4.5" Margin="0,30,0,0" Stroke="Black" VerticalAlignment="Top" Fill="Violet" RenderTransformOrigin="0.5,0.5" StrokeThickness="0.1"/>
-
-					</Grid>
-				</Grid>
+						
+					</Canvas>
+				</Canvas>
 			</Viewbox>
 			<Label x:Name="lblPlayerPosition" Content="Label" HorizontalAlignment="Left" Margin="1700,0,0,0" VerticalAlignment="Top" FontSize="20"/>
 			<Label x:Name="lblSpeed" Content="Label" HorizontalAlignment="Left" Margin="1700,35,0,0" VerticalAlignment="Top" FontSize="20"/>

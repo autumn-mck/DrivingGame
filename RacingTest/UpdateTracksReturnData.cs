@@ -11,14 +11,15 @@ namespace RacingTest
 	/// </summary>
 	public class UpdateTracksReturnData
 	{
-		public Vector2 Position { get; set; }
-		public Vector2 LastLinePos { get; set; }
-		public Vector2 WheelDirection { get; set; }
-		public float WheelMovementAngle { get; set; }
+		public Vector2D Position { get; set; }
+		public Vector2D LastLinePos { get; set; }
+		public Vector2D WheelDirection { get; set; }
+		public double WheelMovementAngle { get; set; }
 		public string LnName { get; set; }
 		public Brush TrailBrush { get; set; }
+		public Line2D Line { get; set; }
 
-		public UpdateTracksReturnData(Vector2 position, Vector2 lastLinePos, Vector2 wheelDirection, float wheelMovementAngle, string lnName, Brush trailBrush)
+		public UpdateTracksReturnData(Vector2D position, Vector2D lastLinePos, Vector2D wheelDirection, double wheelMovementAngle, string lnName, Brush trailBrush, Line2D ln)
 		{
 			Position = position;
 			LastLinePos = lastLinePos;
@@ -26,6 +27,7 @@ namespace RacingTest
 			WheelMovementAngle = wheelMovementAngle;
 			LnName = lnName;
 			TrailBrush = trailBrush;
+			Line = ln;
 		}
 	}
 }
