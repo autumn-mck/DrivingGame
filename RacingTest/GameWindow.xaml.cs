@@ -21,6 +21,7 @@ namespace RacingTest
 	{
 		// A list of all cars/players
 		List<Car> cars = new List<Car>();
+		List<Car> carsToAddQueue = new List<Car>();
 
 		// Used to let other threads know when they should quit as the application is closing
 		bool toExit = false;
@@ -37,29 +38,30 @@ namespace RacingTest
 		// Used to keep track of the current position in frameRates[]
 		int frameCount = 0;
 
-		// A writeable bitmap that was being used for testing, however is not currently used due to performance issues
-		WriteableBitmap wrCarBitmap = new WriteableBitmap(640, 360, 96, 96, PixelFormats.Bgr32, null);
-
 		string trackDataLocation = Directory.GetCurrentDirectory() + "//track2//";
 
 		// The image that shows what material a part of the track is made of
 		BitmapImage trackBitmap;
 		// The data from trackBitmap in byte[] form
 		byte[] terrainPixelByteArray;
-		
+
+		List<Vector2D> baseAims = new List<Vector2D>();
+
+		Random random;
+
 		public GameWindow()
 		{
 			InitializeComponent();
+			RenderOptions.SetBitmapScalingMode(imgWrBitmapCars, BitmapScalingMode.NearestNeighbor);
 
-			List<Vector2> baseAims = new List<Vector2>();
 			// Reads the location aims for computers in from TrackData.txt to baseAims
 			{
 				FileStream fs = new FileStream(trackDataLocation + "TrackData.txt", FileMode.Open);
 				StreamReader sr = new StreamReader(fs);
 				string line;
 				string lineSoFar;
-				float vec1 = float.NaN;
-				float vec2 = float.NaN;
+				double vec1 = double.NaN;
+				double vec2 = double.NaN;
 
 				while ((line = sr.ReadLine()) != null)
 				{
@@ -70,60 +72,56 @@ namespace RacingTest
 							lineSoFar += c;
 						else
 						{
-							vec1 = (float)Convert.ToDouble(lineSoFar);
+							vec1 = Convert.ToDouble(lineSoFar);
 							lineSoFar = "";
 						}
 					}
-					vec2 = (float)Convert.ToDouble(lineSoFar);
-					baseAims.Add(new Vector2(vec1, vec2));
+					vec2 = Convert.ToDouble(lineSoFar);
+					baseAims.Add(new Vector2D(vec1, vec2));
 				}
 				sr.Close();
 			}
 			
 			// Add 7 cars - 1 player and 6 computers. Currently also requires you to add an element to GameWindow.xml to represent the car and ScreenUpdateLoop().
-			cars.Add(new PlayerCar(new Vector2(120, 95), Vector2.Zero, 10, 1500, "Car1", Key.W, Key.A, Key.D));
-			cars.Add(new ComputerCar(new Vector2(140, 90), Vector2.Zero, 10, 1500, "Car2", baseAims));
-			cars.Add(new ComputerCar(new Vector2(130, 95), Vector2.Zero, 10, 1500, "Car3", baseAims));
-			cars.Add(new ComputerCar(new Vector2(120, 90), Vector2.Zero, 10, 1500, "Car4", baseAims));
-			cars.Add(new ComputerCar(new Vector2(100, 95), Vector2.Zero, 10, 1500, "Car5", baseAims));
-			cars.Add(new ComputerCar(new Vector2(80, 90), Vector2.Zero, 10, 1500, "Car6", baseAims));
-			cars.Add(new ComputerCar(new Vector2(60, 95), Vector2.Zero, 10, 1500, "Car7", baseAims));
+			cars.Add(new PlayerCar(new Vector2D(120, 95), Vector2D.Zero, 10, 1500, "Car1", Brushes.Red, Key.W, Key.A, Key.D));
+			cars.Add(new ComputerCar(new Vector2D(140, 90), Vector2D.Zero, 10, 1500, "Car2", Brushes.Orange, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(130, 95), Vector2D.Zero, 10, 1500, "Car3", Brushes.Yellow, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(120, 90), Vector2D.Zero, 10, 1500, "Car4", Brushes.Green, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(100, 95), Vector2D.Zero, 10, 1500, "Car5", Brushes.Blue, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(80, 90), Vector2D.Zero, 10, 1500, "Car6", Brushes.Indigo, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(60, 95), Vector2D.Zero, 10, 1500, "Car7", Brushes.Violet, baseAims));
 
 			// For each computer, slightly randomize its aim locations by +-2. This is done to prevent all computers taking exactly the same path
-			{
-				Random random = new Random();
-				for (int i = 0; i < cars.Count; i++)
-				{
-					cars[i].FrameCount = i;
-					cars[i].TrailBrush = new ImageBrush(new BitmapImage(new Uri(Directory.GetCurrentDirectory() + "//testTrail.png")));
 
-					if (cars[i] is ComputerCar c)
+			random = new Random();
+			for (int i = 0; i < cars.Count; i++)
+			{
+				cars[i].FrameCount = i;
+				cars[i].TrailBrush = Brushes.Black.Clone();
+				grdTrack.Children.Add(cars[i].Rectangle);
+
+				if (cars[i] is ComputerCar c)
+				{
+					List<Vector2D> randomisedAims = new List<Vector2D>();
+					foreach (Vector2D vector in c.AimList)
 					{
-						List<Vector2> randomisedAims = new List<Vector2>();
-						foreach (Vector2 vector in c.AimList)
-						{
-							randomisedAims.Add(RandomizeVector2InRange(vector, 2, random));
-						}
-						c.AimList = randomisedAims;
+						randomisedAims.Add(RandomizeVector2InRange(vector, 2, random));
 					}
+					c.AimList = randomisedAims;
 				}
 			}
 
+
 			// Add  trackBitmap as the window background so the user can see the terrain
 			trackBitmap = new BitmapImage(new Uri(Directory.GetCurrentDirectory() + "//track2//terrain.png"));
-			Image image = new Image
-			{
-				Source = trackBitmap
-			};
-			grd.Children.Add(image);
-
+			imgBG.Source = trackBitmap;
 			// Copy the data from trackBitmap to terrainPixelByteArray
 			int height = trackBitmap.PixelHeight;
 			int width = trackBitmap.PixelWidth;
 			int nStride = (trackBitmap.PixelWidth * trackBitmap.Format.BitsPerPixel + 7) / 8;
 			terrainPixelByteArray = new byte[trackBitmap.PixelHeight * nStride];
 			trackBitmap.CopyPixels(terrainPixelByteArray, nStride, 0);
-
+			trackBitmap.Freeze();
 
 			gameThread = new Thread(GameLoop);
 			screenUpdateThread = new Thread(ScreenUpdateLoop);
@@ -131,7 +129,7 @@ namespace RacingTest
 			// Code to show the aim points for computers
 			{
 				//Rectangle rct;
-				//foreach (Vector2 vec in baseAims)
+				//foreach (Vector2D vec in baseAims)
 				//{
 				//	rct = new Rectangle
 				//	{
@@ -145,17 +143,14 @@ namespace RacingTest
 				//	grdTrack.Children.Add(rct);
 				//}
 			}
-
-			// Show the experimental writeable bitmap
-			//imgWrBitmapCars.Source = wrCarBitmap;
 		}
 
 		/// <summary>
 		/// Randomises the given vector within the given range (X and Y randomised independently) with the given Random
 		/// </summary>
-		private Vector2 RandomizeVector2InRange(Vector2 vector, float range, Random random)
+		private Vector2D RandomizeVector2InRange(Vector2D vector, double range, Random random)
 		{
-			return new Vector2(vector.X + (float)(random.NextDouble() - 0.5) * 2 * range, vector.Y + (float)(random.NextDouble() - 0.5) * 2 * range);
+			return new Vector2D(vector.X + (random.NextDouble() - 0.5) * 2 * range, vector.Y + (random.NextDouble() - 0.5) * 2 * range);
 		}
 
 		/// <summary>
@@ -168,10 +163,22 @@ namespace RacingTest
 			while (!toExit)
 			{
 				timeElapsed = stopwatch.Elapsed.TotalMilliseconds / 1000;
+				stopwatch.Restart();
+
 				PhysicsUpdate();
 				UpdateFrameRates();
-				stopwatch.Restart();
-				while (stopwatch.Elapsed.Ticks < 999) { }
+				if (carsToAddQueue.Count > 0)
+				{
+					foreach (Car c in carsToAddQueue)
+					{
+						cars.Add(c);
+					}
+					//Thread.Sleep(1);
+					carsToAddQueue.Clear();
+
+				}
+
+				//while (stopwatch.Elapsed.Ticks < 1) { }
 			}
 		}
 
@@ -182,7 +189,8 @@ namespace RacingTest
 		{
 			frameRates[frameCount] = 1 / timeElapsed;
 			frameCount++;
-			if (frameCount == frameRates.Length) frameCount = 0;
+			frameCount %= frameRates.Length;
+			//if (frameCount == frameRates.Length) frameCount = 0;
 		}
 
 		private void PhysicsUpdate()
@@ -190,16 +198,15 @@ namespace RacingTest
 			foreach (Car currentCar in cars)
 			{
 				currentCar.UpdateRotation(timeElapsed);
-				currentCar.UpdateVelocity(timeElapsed, GetMaterial(new Vector2(currentCar.Position.X + 2.25f, currentCar.Position.Y + 1.5f)));
+				currentCar.UpdateVelocity(timeElapsed, GetMaterial(new Vector2D(currentCar.Position.X + 2.25, currentCar.Position.Y + 1.5)));
 				currentCar.UpdatePosition(timeElapsed);
 				SimulateCollision(currentCar);
-
-				// Debug - teleports all players to the centre if the 'R' key is held down
+				// Debug - teleports players to the centre if the 'R' key is held down
 				if (currentCar is PlayerCar car)
 				{
 					if (car.KeysDown.Contains(Key.R))
 					{
-						currentCar.Position = new Vector2(Constants.courseWidth / 2, Constants.courseHeight / 2);
+						currentCar.Position = new Vector2D(Constants.courseWidth / 2, Constants.courseHeight / 2);
 					}
 				}
 			}
@@ -213,28 +220,32 @@ namespace RacingTest
 			foreach (Car c in cars)
 			{
 				if (c == currentCar) continue;
-				foreach (Vector2 vector in c.CarCorners)
+				if (c.CarCorners == null) continue;
+				foreach (Vector2D vector in c.CarCorners)
 				{
 					if ((currentCar.Position - c.Position).Length() < 5)
 					{
 						if (PointInQuad(vector, currentCar.CarCorners))
 						{
-							// Considers a player's car to weigh 1.3 times more, as this makes collisions more fun!
-							float pMult = 1;
-							float cMult = 1;
+							// Considers a player's car to weigh 5 times more, as this makes collisions more fun!
+							double pMult = 1;
+							double cMult = 1;
 							if (currentCar is PlayerCar)
-								pMult *= 1.3f;
+								pMult *= 5;
 							if (c is PlayerCar)
-								cMult *= 1.3f;
+								cMult *= 5;
 
 							// Assuming perfect inelastic collision, i.e. conservation of momentum
-							currentCar.Velocity = (currentCar.Mass * currentCar.Velocity * pMult + c.Mass * c.Velocity * cMult) / (currentCar.Mass * pMult + c.Mass * cMult);
-							c.Velocity = currentCar.Velocity;
+							Vector2D newVelocity = (currentCar.Mass * currentCar.Velocity * pMult + c.Mass * c.Velocity * cMult) / (currentCar.Mass * pMult + c.Mass * cMult);
+							currentCar.Velocity = newVelocity * timeElapsed * 100 + currentCar.Velocity * (1 - timeElapsed * 100);
+							c.Velocity = newVelocity * timeElapsed * 100 + c.Velocity * (1 - timeElapsed * 100);
 
 							// Moves the cars slightly further away from each other.
-							Vector2 playerCvector = currentCar.Position - c.Position;
-							currentCar.Position += playerCvector * (float)timeElapsed * 2;
-							c.Position -= playerCvector * (float)timeElapsed * 2;
+							Vector2D playerCvector = (currentCar.Position - c.Position).Normalised();
+							c.ExternalForces -= playerCvector * (c.Mass / cMult * pMult * (currentCar.Velocity - c.Velocity).Length() / timeElapsed) / 50;
+							currentCar.ExternalForces += playerCvector * (currentCar.Mass / pMult * cMult * (c.Velocity - currentCar.Velocity).Length() / timeElapsed) / 50;
+							currentCar.Position += playerCvector * timeElapsed * 2;
+							c.Position -= playerCvector * timeElapsed * 2;
 						}
 					}
 				}
@@ -248,72 +259,38 @@ namespace RacingTest
 		{
 			while (!toExit)
 			{
-				UpdateTyreTracks();
+				// Tyre tracks are done with a low a priority as possible
+				try
+				{
+					Dispatcher.BeginInvoke(new Action(UpdateTyreTracks), System.Windows.Threading.DispatcherPriority.SystemIdle);
+				}
+				catch
+				{
+					continue;
+				}
 
-				// Output results
 				Dispatcher.Invoke(() =>
 				{
-					// *Absolutely* needs improvement.
-					rctRectP1.Margin = new Thickness(cars[0].Position.X, cars[0].Position.Y, 0, 0);
-					rctRectP1.RenderTransform = new RotateTransform(cars[0].Rotation);
-					rctRectP2.Margin = new Thickness(cars[1].Position.X, cars[1].Position.Y, 0, 0);
-					rctRectP2.RenderTransform = new RotateTransform(cars[1].Rotation);
-					rctRectP3.Margin = new Thickness(cars[2].Position.X, cars[2].Position.Y, 0, 0);
-					rctRectP3.RenderTransform = new RotateTransform(cars[2].Rotation);
-					rctRectP4.Margin = new Thickness(cars[3].Position.X, cars[3].Position.Y, 0, 0);
-					rctRectP4.RenderTransform = new RotateTransform(cars[3].Rotation);
-					rctRectP5.Margin = new Thickness(cars[4].Position.X, cars[4].Position.Y, 0, 0);
-					rctRectP5.RenderTransform = new RotateTransform(cars[4].Rotation);
-					rctRectP6.Margin = new Thickness(cars[5].Position.X, cars[5].Position.Y, 0, 0);
-					rctRectP6.RenderTransform = new RotateTransform(cars[5].Rotation);
-					rctRectP7.Margin = new Thickness(cars[6].Position.X, cars[6].Position.Y, 0, 0);
-					rctRectP7.RenderTransform = new RotateTransform(cars[6].Rotation);
-
+					try
+					{
+						foreach (Car c in cars)
+						{
+							c.Rectangle.Margin = new Thickness(c.Position.X, c.Position.Y, 0, 0);
+							c.Rectangle.RenderTransform = new RotateTransform(c.Rotation);
+						}
+					}
+					catch
+					{
+						return;
+					}
 					// Labels used for debugging
 					lblPlayerPosition.Content = cars[0].Position;
 					lblSpeed.Content = cars[0].Velocity.Length();
 					lblFrametime.Content = frameRates.Average();
 					lblRotation.Content = cars[0].Rotation;
 
-					// Test to see if a WritableBitmap could be used to increase rendering performance. However, the following code currently performs worse and does not work well enough due to inaccuracies with PoimtInQuad()
-					//try
-					//{
-					//	wrCarBitmap.Lock();
-
-					//	for (int i = 0; i < wrCarBitmap.PixelWidth; i++)
-					//	{
-					//		for (int j = 0; j < wrCarBitmap.PixelHeight; j++)
-					//		{
-					//			unsafe
-					//			{
-					//				IntPtr pBackBuffer = wrCarBitmap.BackBuffer;
-
-					//				// Find the address of the pixel to draw.
-					//				pBackBuffer += j * wrCarBitmap.BackBufferStride;
-					//				pBackBuffer += i * 4;
-
-					//				// Compute the pixel's colour.
-					//				int color_data = 160 << 16; // R
-					//				color_data |= 128 << 8;   // G
-					//				if (PointInQuad(new Vector2(i + 0.5f, j + 0.5f), cars[0].CarCorners))
-					//					color_data |= 255 << 0;   // B
-					//				else color_data |= 0 << 0;
-
-					//				// Assign the colour data to the pixel.
-					//				*((int*)pBackBuffer) = color_data;
-					//			}
-					//			// Specify the area of the bitmap that changed.
-					//		}
-					//	}
-					//	wrCarBitmap.AddDirtyRect(new Int32Rect(0, 0, wrCarBitmap.PixelWidth, wrCarBitmap.PixelHeight));
-
-					//}
-					//finally
-					//{
-					//	wrCarBitmap.Unlock();
-					//}
-				});
-				Thread.Sleep(12); // Around 12 is recommended due to performance issues
+				});				
+				Thread.Sleep(5); // Needs tweaking due to performance issues
 			}
 		}
 
@@ -322,20 +299,25 @@ namespace RacingTest
 		/// </summary>
 		private void UpdateTyreTracks()
 		{
-			foreach (Car car in cars)
+			try
 			{
-				UpdateTracksReturnData trackData = car.UpdateTracks();
-				// null is returned by car.UpdateTracks() if no new line is needed
-				if (trackData != null)
+				foreach (Car car in cars)
 				{
-					Dispatcher.Invoke(() =>
+					UpdateTracksReturnData trackData = car.UpdateTracks();
+					// null is returned by car.UpdateTracks() if no new line is needed
+					if (trackData != null)
 					{
+						if (trackData.Position == null || trackData.LastLinePos == null) return;
+
+						trackData.TrailBrush = trackData.TrailBrush.Clone();
+						trackData.TrailBrush.Opacity = trackData.WheelMovementAngle;
+
 						bool lineFound = false;
 						foreach (UIElement element in grdTyreTracks.Children)
 						{
 							if (element is Line ln)
 							{
-							// Repositions LnName to where it should be
+								//Repositions LnName to where it should be
 								if (ln.Name == trackData.LnName)
 								{
 									lineFound = true;
@@ -343,44 +325,62 @@ namespace RacingTest
 									ln.X2 = trackData.LastLinePos.X;
 									ln.Y1 = trackData.Position.Y;
 									ln.Y2 = trackData.LastLinePos.Y;
-									ln.Opacity = trackData.WheelMovementAngle;
+									ln.Stroke = trackData.TrailBrush;
 									break;
 								}
 							}
 						}
 
 						// Creates a new line if LnName does not yet exist
-						if (!lineFound)
+						if (!lineFound && trackData.Position != null)
 						{
-							Line line = new Line
+							try
 							{
-								X1 = trackData.Position.X,
-								X2 = trackData.LastLinePos.X,
-								Y1 = trackData.Position.Y,
-								Y2 = trackData.LastLinePos.Y,
-								Stroke = trackData.TrailBrush,
-								HorizontalAlignment = HorizontalAlignment.Left,
-								VerticalAlignment = VerticalAlignment.Top,
-								StrokeThickness = 0.5,
-								Name = trackData.LnName,
-								Opacity = trackData.WheelMovementAngle
-							};
-							grdTyreTracks.Children.Add(line);
+								Line line = new Line
+								{
+									X1 = trackData.Position.X,
+									X2 = trackData.LastLinePos.X,
+									Y1 = trackData.Position.Y,
+									Y2 = trackData.LastLinePos.Y,
+									Stroke = trackData.TrailBrush,
+									HorizontalAlignment = HorizontalAlignment.Left,
+									VerticalAlignment = VerticalAlignment.Top,
+									StrokeThickness = 0.5,
+									Name = trackData.LnName,
+									IsHitTestVisible = false
+								};
+								grdTyreTracks.Children.Add(line);
+							}
+							catch
+							{
+								return;
+							}
 						}
-					});
+					}
 				}
+			}
+			catch
+			{
+				return;
 			}
 		}
 
 		/// <summary>
 		/// Returns the track material at the given location
 		/// </summary>
-		private Material GetMaterial(Vector2 location)
+		private Material GetMaterial(Vector2D location)
 		{
-			int currentPixelColour = terrainPixelByteArray[(int)(location.X / Constants.courseWidth * 1920) * 4 + (int)(location.Y / Constants.courseHeight * 1080) * 1920 * 4];
-			if (currentPixelColour == 68)
-				return Materials.Tarmac;
-			else return Materials.Grass;
+			try
+			{
+				int currentPixelColour = terrainPixelByteArray[(int)(location.X / Constants.courseWidth * 1920) * 4 + (int)(location.Y / Constants.courseHeight * 1080) * 1920 * 4];
+				if (currentPixelColour == 68)
+					return Materials.Tarmac;
+				else return Materials.Grass;
+			}
+			catch
+			{
+				return Materials.Grass;
+			}
 		}
 
 		/// <summary>
@@ -395,7 +395,7 @@ namespace RacingTest
 		/// <summary>
 		/// Returns true if the quad quadPoints contains point
 		/// </summary>
-		private bool PointInQuad(Vector2 point, Vector2[] quadPoints)
+		private bool PointInQuad(Vector2D point, Vector2D[] quadPoints)
 		{
 			if (PointInTri(point, quadPoints[0], quadPoints[1], quadPoints[2]) || PointInTri(point, quadPoints[1], quadPoints[2], quadPoints[3]))
 				return true;
@@ -408,14 +408,14 @@ namespace RacingTest
 		/// Warning: is inaccurate!
 		/// Works well enough for now for short-range collision checks, but must be fixed in future, especially before it is used for anything other than basic collision checks
 		/// </summary>
-		private bool PointInTri(Vector2 point, Vector2 t1, Vector2 t2, Vector2 t3)
+		private bool PointInTri(Vector2D point, Vector2D t1, Vector2D t2, Vector2D t3)
 		{
 			double TotalArea = CalcTriArea(t1, t2, t3);
 			double Area1 = CalcTriArea(point, t2, t3);
 			double Area2 = CalcTriArea(point, t1, t3);
 			double Area3 = CalcTriArea(point, t1, t2);
 
-			if ((Area1 + Area2 + Area3) > TotalArea)
+			if (Area1 + Area2 + Area3 >  TotalArea)
 				return false;
 			else
 				return true;
@@ -424,12 +424,9 @@ namespace RacingTest
 		/// <summary>
 		/// Returns area of the given triangle
 		/// </summary>
-		double CalcTriArea(Vector2 p1, Vector2 p2, Vector2 p3)
+		double CalcTriArea(Vector2D p1, Vector2D p2, Vector2D p3)
 		{
-			double a = (p1 - p2).LengthSquared();
-			double b = (p2 - p3).LengthSquared();
-			double c = (p1 - p3).LengthSquared();
-			return 0.25 * Math.Sqrt(4 * a * b - (a + b - c) * (a + b - c));
+			return Math.Abs(0.5 * (p1.X * (p2.Y - p3.Y) + p2.X * (p3.Y - p1.Y) + p3.X * (p1.Y - p2.Y)));
 		}
 
 		/// <summary>
@@ -442,6 +439,16 @@ namespace RacingTest
 				if (player is PlayerCar car)
 					if (!car.KeysDown.Contains(e.Key))
 						car.KeysDown.Add(e.Key);
+			}
+
+			if (e.Key == Key.C)
+			{
+				Car toAdd = new ComputerCar(new Vector2D(60, 95), Vector2D.Zero, 10, 1500, "Car" + (cars.Count + 2), new SolidColorBrush(Color.FromRgb((byte)random.Next(0, 256), (byte)random.Next(0, 256), (byte)random.Next(0, 256))), baseAims);
+				toAdd.FrameCount = 0;
+				toAdd.TrailBrush = Brushes.Black.Clone();
+				carsToAddQueue.Add(toAdd);
+
+				grdTrack.Children.Add(toAdd.Rectangle);
 			}
 			// W - Accelerate
 			// A - Rotate left
