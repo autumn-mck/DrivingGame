@@ -1,2 +1,4 @@
 # DrivingGame
-A short project to determine the viability of a real-time game in WPF and to experiment with some physics simulation 
+An ongoing project to create a driving game. Written in C# and currently using WPF.
+
+This is being created as a side project while busy with schoolwork, so slow progress is expected.
