@@ -127,22 +127,24 @@ namespace RacingTest
 			screenUpdateThread = new Thread(ScreenUpdateLoop);
 
 			// Code to show the aim points for computers
-			{
-				//Rectangle rct;
-				//foreach (Vector2D vec in baseAims)
-				//{
-				//	rct = new Rectangle
-				//	{
-				//		Fill = Brushes.Red,
-				//		Width = 1,
-				//		Height = 1,
-				//		Margin = new Thickness(vec.X, vec.Y, 0, 0),
-				//		HorizontalAlignment = HorizontalAlignment.Left,
-				//		VerticalAlignment = VerticalAlignment.Top
-				//	};
-				//	grdTrack.Children.Add(rct);
-				//}
-			}
+
+			//Rectangle rct;
+			//foreach (Vector2D vec in baseAims)
+			//{
+			//	rct = new Rectangle
+			//	{
+			//		Fill = Brushes.Red,
+			//		Width = 1,
+			//		Height = 1,
+			//		Margin = new Thickness(vec.X, vec.Y, 0, 0),
+			//		HorizontalAlignment = HorizontalAlignment.Left,
+			//		VerticalAlignment = VerticalAlignment.Top
+			//	};
+			//	grdTrack.Children.Add(rct);
+			//}
+
+			
+			
 		}
 
 		/// <summary>
@@ -213,7 +215,9 @@ namespace RacingTest
 		}
 
 		/// <summary>
-		/// Simulates collision between cars - makes significant assumptions and should be significantly improved
+		/// Simulates collision between cars
+		/// Still has issues with cars occasionally cliping into one another
+		/// Currently cars "stick" to eachother too much
 		/// </summary>
 		private void SimulateCollision(Car currentCar)
 		{
@@ -223,7 +227,7 @@ namespace RacingTest
 				if (c.CarCorners == null) continue;
 				foreach (Vector2D vector in c.CarCorners)
 				{
-					if ((currentCar.Position - c.Position).Length() < 5)
+					if ((currentCar.Position - c.Position).LengthSquared() < 26)
 					{
 						if (PointInQuad(vector, currentCar.CarCorners))
 						{
@@ -234,22 +238,97 @@ namespace RacingTest
 								pMult *= 5;
 							if (c is PlayerCar)
 								cMult *= 5;
-
+							
 							// Assuming perfect inelastic collision, i.e. conservation of momentum
-							Vector2D newVelocity = (currentCar.Mass * currentCar.Velocity * pMult + c.Mass * c.Velocity * cMult) / (currentCar.Mass * pMult + c.Mass * cMult);
-							currentCar.Velocity = newVelocity * timeElapsed * 100 + currentCar.Velocity * (1 - timeElapsed * 100);
-							c.Velocity = newVelocity * timeElapsed * 100 + c.Velocity * (1 - timeElapsed * 100);
+							Vector2D newVelocity = (currentCar.Mass * pMult * currentCar.Velocity + c.Mass * cMult * c.Velocity) / (currentCar.Mass * pMult + c.Mass * cMult);
+							currentCar.Velocity = newVelocity;
+							c.Velocity = newVelocity;
 
-							// Moves the cars slightly further away from each other.
-							Vector2D playerCvector = (currentCar.Position - c.Position).Normalised();
-							c.ExternalForces -= playerCvector * (c.Mass / cMult * pMult * (currentCar.Velocity - c.Velocity).Length() / timeElapsed) / 50;
-							currentCar.ExternalForces += playerCvector * (currentCar.Mass / pMult * cMult * (c.Velocity - currentCar.Velocity).Length() / timeElapsed) / 50;
-							currentCar.Position += playerCvector * timeElapsed * 2;
-							c.Position -= playerCvector * timeElapsed * 2;
+							// Should also consider mass of car
+							Vector2D nearestPoint;
+							double distToC = DistToQuad(currentCar.CarCorners, vector, out nearestPoint);
+							currentCar.Position -= (nearestPoint - vector) * c.Mass / pMult / (currentCar.Mass * pMult + c.Mass * cMult);
+							c.Position += (nearestPoint - vector) * currentCar.Mass / cMult / (currentCar.Mass * pMult + c.Mass * cMult);
 						}
 					}
 				}
 			}
+		}
+
+		private double DistToQuad(Vector2D[] corners, Vector2D point, out Vector2D closestPoint)
+		{
+			// Checked in incorrect way?
+			double closestDist;
+			closestDist = FindDistanceToSegment(point, corners[0], corners[1], out closestPoint);
+			Vector2D compPoint;
+			double compDist;
+
+			compDist = FindDistanceToSegment(point, corners[1], corners[3], out compPoint);
+			if (compDist < closestDist)
+			{
+				closestDist = compDist;
+				closestPoint = compPoint;
+			}
+
+			compDist = FindDistanceToSegment(point, corners[3], corners[2], out compPoint);
+			if (compDist < closestDist)
+			{
+				closestDist = compDist;
+				closestPoint = compPoint;
+			}
+
+			compDist = FindDistanceToSegment(point, corners[2], corners[0], out compPoint);
+			if (compDist < closestDist)
+			{
+				closestDist = compDist;
+				closestPoint = compPoint;
+			}
+
+			return closestDist;
+		}
+
+		// Calculate the distance between
+		// point pt and the segment p1 --> p2.
+		private double FindDistanceToSegment(
+			Vector2D pt, Vector2D p1, Vector2D p2, out Vector2D closest)
+		{
+			double dx = p2.X - p1.X;
+			double dy = p2.Y - p1.Y;
+			if ((dx == 0) && (dy == 0))
+			{
+				// If p1 and p2 are the same point (Not a line)
+				closest = p1;
+				dx = pt.X - p1.X;
+				dy = pt.Y - p1.Y;
+				return Math.Sqrt(dx * dx + dy * dy);
+			}
+
+			// Calculate the t that minimizes the distance.
+			double t = ((pt.X - p1.X) * dx + (pt.Y - p1.Y) * dy) /
+				(dx * dx + dy * dy);
+
+			// See if this represents one of the segment's
+			// end points or a point in the middle.
+			if (t < 0)
+			{
+				closest = new Vector2D(p1.X, p1.Y);
+				dx = pt.X - p1.X;
+				dy = pt.Y - p1.Y;
+			}
+			else if (t > 1)
+			{
+				closest = new Vector2D(p2.X, p2.Y);
+				dx = pt.X - p2.X;
+				dy = pt.Y - p2.Y;
+			}
+			else
+			{
+				closest = new Vector2D(p1.X + t * dx, p1.Y + t * dy);
+				dx = pt.X - closest.X;
+				dy = pt.Y - closest.Y;
+			}
+
+			return Math.Sqrt(dx * dx + dy * dy);
 		}
 
 		/// <summary>
@@ -279,10 +358,7 @@ namespace RacingTest
 							c.Rectangle.RenderTransform = new RotateTransform(c.Rotation);
 						}
 					}
-					catch
-					{
-						return;
-					}
+					catch { return; }
 					// Labels used for debugging
 					lblPlayerPosition.Content = cars[0].Position;
 					lblSpeed.Content = cars[0].Velocity.Length();
@@ -290,7 +366,7 @@ namespace RacingTest
 					lblRotation.Content = cars[0].Rotation;
 
 				});				
-				Thread.Sleep(5); // Needs tweaking due to performance issues
+				Thread.Sleep(7); // Needs tweaking due to performance issues
 			}
 		}
 
@@ -405,28 +481,14 @@ namespace RacingTest
 
 		/// <summary>
 		/// Returns true if the triangle with corners t1, t2, t3 contains point.
-		/// Warning: is inaccurate!
-		/// Works well enough for now for short-range collision checks, but must be fixed in future, especially before it is used for anything other than basic collision checks
+		/// Uses Barycentric coordinate system
 		/// </summary>
 		private bool PointInTri(Vector2D point, Vector2D t1, Vector2D t2, Vector2D t3)
 		{
-			double TotalArea = CalcTriArea(t1, t2, t3);
-			double Area1 = CalcTriArea(point, t2, t3);
-			double Area2 = CalcTriArea(point, t1, t3);
-			double Area3 = CalcTriArea(point, t1, t2);
-
-			if (Area1 + Area2 + Area3 >  TotalArea)
-				return false;
-			else
-				return true;
-		}
-
-		/// <summary>
-		/// Returns area of the given triangle
-		/// </summary>
-		double CalcTriArea(Vector2D p1, Vector2D p2, Vector2D p3)
-		{
-			return Math.Abs(0.5 * (p1.X * (p2.Y - p3.Y) + p2.X * (p3.Y - p1.Y) + p3.X * (p1.Y - p2.Y)));
+			double a = ((t2.Y - t3.Y) * (point.X - t3.X) + (t3.X - t2.X) * (point.Y - t3.Y)) / ((t2.Y - t3.Y) * (t1.X - t3.X) + (t3.X - t2.X) * (t1.Y - t3.Y));
+			double b = ((t3.Y - t1.Y) * (point.X - t3.X) + (t1.X - t3.X) * (point.Y - t3.Y)) / ((t2.Y - t3.Y) * (t1.X - t3.X) + (t3.X - t2.X) * (t1.Y - t3.Y));
+			double c = 1 - a - b;
+			return 0 <= a && a <= 1 && 0 <= b && b <= 1 && 0 <= c && c <= 1;
 		}
 
 		/// <summary>
@@ -443,11 +505,13 @@ namespace RacingTest
 
 			if (e.Key == Key.C)
 			{
-				Car toAdd = new ComputerCar(new Vector2D(60, 95), Vector2D.Zero, 10, 1500, "Car" + (cars.Count + 2), new SolidColorBrush(Color.FromRgb((byte)random.Next(0, 256), (byte)random.Next(0, 256), (byte)random.Next(0, 256))), baseAims);
-				toAdd.FrameCount = 0;
-				toAdd.TrailBrush = Brushes.Black.Clone();
+				Vector2D pos = RandomizeVector2InRange(new Vector2D(60, 95), 7, random);
+				Car toAdd = new ComputerCar(pos, Vector2D.Zero, 10, 1500, "Car" + (cars.Count + 2), new SolidColorBrush(Color.FromRgb((byte)random.Next(0, 256), (byte)random.Next(0, 256), (byte)random.Next(0, 256))), baseAims)
+				{
+					FrameCount = 0,
+					TrailBrush = Brushes.Black.Clone()
+				};
 				carsToAddQueue.Add(toAdd);
-
 				grdTrack.Children.Add(toAdd.Rectangle);
 			}
 			// W - Accelerate
@@ -475,6 +539,32 @@ namespace RacingTest
 		{
 			gameThread.Start();
 			screenUpdateThread.Start();
+
+			// Code for collision testing debugging
+			//Thread.Sleep(10);
+			//Rectangle rct;
+			//cars[0].Rotation = 29.0123213;
+			//for (float i = 118; i < 126; i += 0.1f)
+			//{
+			//	for (float j = 93; j < 100; j += 0.1f)
+			//	{
+			//		rct = new Rectangle
+			//		{
+			//			HorizontalAlignment = HorizontalAlignment.Left,
+			//			VerticalAlignment = VerticalAlignment.Top,
+			//			Width = 0.1,
+			//			Height = 0.1,
+			//			Margin = new Thickness(i, j, 0, 0)
+			//			//Opacity = 0.5
+			//		};
+			//		if (PointInQuad(new Vector2D(i, j), cars[0].CarCorners))
+			//		{
+			//			rct.Fill = Brushes.Blue;
+			//		}
+			//		else rct.Fill = Brushes.Transparent;
+			//		grdTrack.Children.Add(rct);
+			//	}
+			//}
 		}
 	}
 }
