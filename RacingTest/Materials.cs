@@ -6,8 +6,8 @@ namespace RacingTest
 {
 	static class Materials
 	{
-		public static Material Grass = new Material(0.3f, 0.7f, 2, "Grass"); // Although 2 times air resistance is unrealistic, it provides a greater penalty for driving off the track
-		public static Material Tarmac = new Material(0.02f, 0.7f, 1, "Tarmac");
+		public static Material Grass = new Material(0.3f, 0.8f, 2, "Grass"); // Although 2 times air resistance is unrealistic, it provides a greater penalty for driving off the track
+		public static Material Tarmac = new Material(0.03f, 0.8f, 1, "Tarmac");
 	}
 
 	public class Material

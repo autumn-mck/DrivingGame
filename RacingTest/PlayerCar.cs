@@ -18,8 +18,8 @@ namespace RacingTest
 
 		public Vector2D[] LastLinePos { get; set; } // Contains 2 coordinates, representing the last locations a line was created for skid marks
 
-		private double TurnRate { get; set; } // The rate at which the car turns
-		public double MaxTurnAngle { get; set; } // The maximum turning angle a car can have
+		public double ExternalTurningForces { get; set; }
+		public double AngularVelocity { get; set; } // The angular velocity of the car in degrees
 
 		public double Mass { get; set; }
 		public double EngineForce { get; set; } // A simplification of how cars work - the engine acts as a constant force on the car
@@ -35,21 +35,7 @@ namespace RacingTest
 
 		public Rectangle Rectangle { get; set; }
 
-		private double turningAngle; // The angle that the car is turning at
-		public double TurningAngle
-		{
-			get { return turningAngle; }
-			set
-			{
-				if (value > MaxTurnAngle)
-					turningAngle = MaxTurnAngle;
-				else if (value < -MaxTurnAngle)
-					turningAngle = -MaxTurnAngle;
-				else turningAngle = value;
-			}
-		}
-
-		private double rotation;
+		private double rotation; // The current rotation of the car in degrees
 		public double Rotation
 		{
 			get { return rotation; }
@@ -65,15 +51,13 @@ namespace RacingTest
 			}
 		}
 
-		public Car(Vector2D _position, Vector2D _velocity, double _maxTurnAngle, double _mass, string _name, Brush _fill)
+		public Car(Vector2D _position, Vector2D _velocity, double _mass, string _name, Brush _fill)
 		{
 			CarCorners = new Vector2D[4];
+			AngularVelocity = 0;
 			Position = _position;
 			Velocity = _velocity;
-			MaxTurnAngle = _maxTurnAngle;
 			Name = _name;
-			TurnRate = 100;
-			TurningAngle = 0;
 			FacingDirection = new Vector2D(0, 1);
 			Rotation = 0;
 			ExternalForces = Vector2D.Zero;
@@ -134,7 +118,7 @@ namespace RacingTest
 				else
 					position = CarCorners[1];
 
-				Vector2D wheelDirection = new Vector2D(Math.Cos((Rotation + TurningAngle) / 180 * Math.PI), Math.Sin((Rotation + TurningAngle) / 180 * Math.PI));
+				Vector2D wheelDirection = new Vector2D(Math.Cos((Rotation) / 180 * Math.PI), Math.Sin((Rotation) / 180 * Math.PI));
 
 				toReturn = new UpdateTracksReturnData(position, LastLinePos[FrameCount % 2], wheelDirection, (AngleBetweenWheelsAndVelocity * AngleBetweenWheelsAndVelocity / 1), "ln" + FrameCount + Name, TrailBrush, new Line2D(position, LastLinePos[FrameCount % 2], (AngleBetweenWheelsAndVelocity * AngleBetweenWheelsAndVelocity / 1)));
 				lines[FrameCount] = new Line2D(position, LastLinePos[FrameCount % 2], toReturn.WheelMovementAngle);
@@ -149,31 +133,20 @@ namespace RacingTest
 		/// </summary>
 		public void UpdateRotation(double timePassed)
 		{
-			double turnMult = GetTurnMult();
-			double rotMult = Math.Sin(Math.Clamp(Math.Abs(TurningAngle), 0, 10) / 10 * Math.PI / 2);
-
+			double turnForce = 0;
 			if (IsTurningLeft())
-			{
-				TurningAngle -= timePassed * TurnRate;
-			}
+				turnForce -= 2000000;
 			if (IsTurningRight())
-			{
-				TurningAngle += timePassed * TurnRate;
-			}
+				turnForce += 2000000;
+			turnForce -= AngularVelocity * Math.Abs(AngularVelocity) * 200;
+			turnForce -= AngularVelocity * 1000;
 
-			if (TurningAngle != 0 && Velocity.LengthSquared() != 0)
-			{
-				if (TurningAngle > 0)
-				{
-					Rotation += Math.Clamp(200 * timePassed * turnMult * rotMult, 0, TurningAngle);
-					TurningAngle -= Math.Clamp(200 * timePassed * turnMult * rotMult, 0, TurningAngle);
-				}
-				else
-				{
-					Rotation -= Math.Clamp(200 * timePassed * turnMult * rotMult, 0, -TurningAngle);
-					TurningAngle += Math.Clamp(200 * timePassed * turnMult * rotMult, 0, -TurningAngle);
-				}
-			}
+			turnForce += ExternalTurningForces;
+			ExternalTurningForces = 0;
+
+			double turnAcc = turnForce / Mass;
+			AngularVelocity += turnAcc * timePassed;
+			Rotation += AngularVelocity * timePassed;
 		}
 
 		/// <summary>
@@ -189,7 +162,7 @@ namespace RacingTest
 				forceY += FacingDirection.Y * EngineForce;
 			}
 
-			Vector2D wheelDirection = new Vector2D(Math.Cos((Rotation + TurningAngle) / 180f * Math.PI), Math.Sin((Rotation + TurningAngle) / 180f * Math.PI));
+			Vector2D wheelDirection = new Vector2D(Math.Cos(Rotation / 180f * Math.PI), Math.Sin(Rotation / 180f * Math.PI));
 			Vector2D friction = Friction(new Vector2D(forceX, forceY), wheelDirection, Velocity.Length(), material);
 
 			forceX += friction.X;
@@ -208,17 +181,15 @@ namespace RacingTest
 			// A car cannot turn while it is stopped
 			if (Velocity.LengthSquared() != 0)
 			{
-				double angleBetweenWheelsAndVelocity = Math.Acos(Vector2D.Dot(wheelDirection, Velocity) / (wheelDirection.Length() * Velocity.Length()));
-				angleBetweenWheelsAndVelocity *= TurningAngle / Math.Abs(TurningAngle);
+				double angleBetweenWheelsAndVelocity = Math.Acos(Vector2D.Dot(wheelDirection, Velocity) / (wheelDirection.Length() * Velocity.Length())) * AngularVelocity / Math.Abs(AngularVelocity);
 				AngleBetweenWheelsAndVelocity = angleBetweenWheelsAndVelocity;
-				if (Math.Abs(angleBetweenWheelsAndVelocity) > 0.01 && angleBetweenWheelsAndVelocity != double.NaN)
+				if (angleBetweenWheelsAndVelocity != 0 && !Double.IsNaN(angleBetweenWheelsAndVelocity) && Velocity.LengthSquared() > 1)
 				{
-					double[] rotationMatrix = new double[4] { Math.Cos(angleBetweenWheelsAndVelocity), -Math.Sin(angleBetweenWheelsAndVelocity), Math.Sin(angleBetweenWheelsAndVelocity), Math.Cos(angleBetweenWheelsAndVelocity) };
-
 					double rotMult = 0.7 / timePassed;
-
-					newX = ((newX * rotationMatrix[0] + newY * rotationMatrix[1]) + newX * rotMult) / (rotMult + 1);
-					newY = ((newX * rotationMatrix[2] + newY * rotationMatrix[3]) + newY * rotMult) / (rotMult + 1);
+					double oldNewX = newX;
+					double oldNewY = newY;
+					newX = ((oldNewX * Math.Cos(angleBetweenWheelsAndVelocity)) - (oldNewY * Math.Sin(angleBetweenWheelsAndVelocity)) + oldNewX * rotMult) / (rotMult + 1);
+					newY = ((oldNewX * Math.Sin(angleBetweenWheelsAndVelocity)) + (oldNewY * Math.Cos(angleBetweenWheelsAndVelocity)) + oldNewY * rotMult) / (rotMult + 1);
 				}
 			}
 
@@ -319,7 +290,7 @@ namespace RacingTest
 	/// </summary>
 	class PlayerCar : Car
 	{
-		public PlayerCar(Vector2D _position, Vector2D _velocity, double _maxTurnAngle, double _mass, string _name, Brush _fill, Key accelerateKey, Key steerLeftKey, Key steerRightKey) : base(_position, _velocity, _maxTurnAngle, _mass, _name, _fill)
+		public PlayerCar(Vector2D _position, Vector2D _velocity, double _mass, string _name, Brush _fill, Key accelerateKey, Key steerLeftKey, Key steerRightKey) : base(_position, _velocity, _mass, _name, _fill)
 		{
 			KeysDown = new List<Key>();
 			AccelerateKey = accelerateKey;
@@ -365,7 +336,7 @@ namespace RacingTest
 		public Vector2D CurrentAim { get; set; }
 		private Vector2D NextAim { get; set; }
 
-		public ComputerCar(Vector2D _position, Vector2D _velocity, double _maxTurnAngle, double _mass, string _name, Brush _brush, List<Vector2D> _aimList) : base(_position, _velocity, _maxTurnAngle, _mass, _name, _brush)
+		public ComputerCar(Vector2D _position, Vector2D _velocity, double _mass, string _name, Brush _brush, List<Vector2D> _aimList) : base(_position, _velocity, _mass, _name, _brush)
 		{
 			AimList = _aimList;
 			CurrentAim = AimList[0];
@@ -386,6 +357,7 @@ namespace RacingTest
 
 		protected override bool IsTurningLeft()
 		{
+			//return false;
 			Vector2D directionToGoal = new Vector2D(CurrentAim.X - Position.X, CurrentAim.Y - Position.Y);
 			double angle = Math.Atan2(directionToGoal.X * FacingDirection.Y - directionToGoal.Y * FacingDirection.X, directionToGoal.X * FacingDirection.X + directionToGoal.Y * FacingDirection.Y);
 
@@ -395,6 +367,7 @@ namespace RacingTest
 
 		protected override bool IsTurningRight()
 		{
+			//return false;
 			Vector2D directionToGoal = new Vector2D(CurrentAim.X - Position.X, CurrentAim.Y - Position.Y);
 			double angle = Math.Atan2(directionToGoal.X * FacingDirection.Y - directionToGoal.Y * FacingDirection.X, directionToGoal.X * FacingDirection.X + directionToGoal.Y * FacingDirection.Y);
 

@@ -81,15 +81,15 @@ namespace RacingTest
 				}
 				sr.Close();
 			}
-			
+
 			// Add 7 cars - 1 player and 6 computers. Currently also requires you to add an element to GameWindow.xml to represent the car and ScreenUpdateLoop().
-			cars.Add(new PlayerCar(new Vector2D(120, 95), Vector2D.Zero, 10, 1500, "Car1", Brushes.Red, Key.W, Key.A, Key.D));
-			cars.Add(new ComputerCar(new Vector2D(140, 90), Vector2D.Zero, 10, 1500, "Car2", Brushes.Orange, baseAims));
-			cars.Add(new ComputerCar(new Vector2D(130, 95), Vector2D.Zero, 10, 1500, "Car3", Brushes.Yellow, baseAims));
-			cars.Add(new ComputerCar(new Vector2D(120, 90), Vector2D.Zero, 10, 1500, "Car4", Brushes.Green, baseAims));
-			cars.Add(new ComputerCar(new Vector2D(100, 95), Vector2D.Zero, 10, 1500, "Car5", Brushes.Blue, baseAims));
-			cars.Add(new ComputerCar(new Vector2D(80, 90), Vector2D.Zero, 10, 1500, "Car6", Brushes.Indigo, baseAims));
-			cars.Add(new ComputerCar(new Vector2D(60, 95), Vector2D.Zero, 10, 1500, "Car7", Brushes.Violet, baseAims));
+			cars.Add(new PlayerCar(new Vector2D(120, 95), Vector2D.Zero, 1500, "Car1", Brushes.Red, Key.W, Key.A, Key.D));
+			cars.Add(new ComputerCar(new Vector2D(140, 90), Vector2D.Zero, 1500, "Car2", Brushes.Orange, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(130, 95), Vector2D.Zero, 1500, "Car3", Brushes.Yellow, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(120, 90), Vector2D.Zero, 1500, "Car4", Brushes.Green, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(100, 95), Vector2D.Zero, 1500, "Car5", Brushes.Blue, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(80, 90), Vector2D.Zero, 1500, "Car6", Brushes.Indigo, baseAims));
+			cars.Add(new ComputerCar(new Vector2D(60, 95), Vector2D.Zero, 1500, "Car7", Brushes.Violet, baseAims));
 
 			// For each computer, slightly randomize its aim locations by +-2. This is done to prevent all computers taking exactly the same path
 
@@ -128,23 +128,23 @@ namespace RacingTest
 
 			// Code to show the aim points for computers
 
-			//Rectangle rct;
-			//foreach (Vector2D vec in baseAims)
-			//{
-			//	rct = new Rectangle
-			//	{
-			//		Fill = Brushes.Red,
-			//		Width = 1,
-			//		Height = 1,
-			//		Margin = new Thickness(vec.X, vec.Y, 0, 0),
-			//		HorizontalAlignment = HorizontalAlignment.Left,
-			//		VerticalAlignment = VerticalAlignment.Top
-			//	};
-			//	grdTrack.Children.Add(rct);
-			//}
+			Rectangle rct;
+			foreach (Vector2D vec in baseAims)
+			{
+				rct = new Rectangle
+				{
+					Fill = Brushes.Red,
+					Width = 1,
+					Height = 1,
+					Margin = new Thickness(vec.X, vec.Y, 0, 0),
+					HorizontalAlignment = HorizontalAlignment.Left,
+					VerticalAlignment = VerticalAlignment.Top
+				};
+				grdTrack.Children.Add(rct);
+			}
 
-			
-			
+
+
 		}
 
 		/// <summary>
@@ -164,7 +164,7 @@ namespace RacingTest
 			stopwatch.Start();
 			while (!toExit)
 			{
-				timeElapsed = stopwatch.Elapsed.TotalMilliseconds / 1000;
+				timeElapsed = stopwatch.Elapsed.TotalMilliseconds / 1000 * 1;
 				stopwatch.Restart();
 
 				PhysicsUpdate();
@@ -175,7 +175,6 @@ namespace RacingTest
 					{
 						cars.Add(c);
 					}
-					//Thread.Sleep(1);
 					carsToAddQueue.Clear();
 
 				}
@@ -235,35 +234,49 @@ namespace RacingTest
 							double pMult = 1;
 							double cMult = 1;
 							if (currentCar is PlayerCar)
-								pMult *= 5;
+								pMult *= 10;
 							if (c is PlayerCar)
-								cMult *= 5;
-							
+								cMult *= 10;
+
 							// Assuming perfect inelastic collision, i.e. conservation of momentum
 							Vector2D newVelocity = (currentCar.Mass * pMult * currentCar.Velocity + c.Mass * cMult * c.Velocity) / (currentCar.Mass * pMult + c.Mass * cMult);
 							currentCar.Velocity = newVelocity;
 							c.Velocity = newVelocity;
 
 							// Should also consider mass of car
-							Vector2D nearestPoint;
-							double distToC = DistToQuad(currentCar.CarCorners, vector, out nearestPoint);
+							_ = DistToQuad(currentCar.CarCorners, vector, out Vector2D nearestPoint);
 							currentCar.Position -= (nearestPoint - vector) * c.Mass / pMult / (currentCar.Mass * pMult + c.Mass * cMult);
 							c.Position += (nearestPoint - vector) * currentCar.Mass / cMult / (currentCar.Mass * pMult + c.Mass * cMult);
+
+							double angleDiff = AngleToNearestAngle(currentCar.Rotation - c.Rotation, 90);
+							currentCar.ExternalTurningForces += angleDiff * 10000;
+							c.ExternalTurningForces += angleDiff * 10000;
+							//currentCar.Rotation += angleDiff / 2 * timeElapsed * 100;
+							//c.Rotation -= angleDiff / 2 * timeElapsed * 100;
 						}
 					}
 				}
 			}
 		}
 
+		// Note: It is assumed that byAngle is positive, but angleToCheck can be either positive or negative.
+		private double AngleToNearestAngle(double angleToCheck, double byAngle)
+		{
+			while (angleToCheck < -byAngle / 2 || angleToCheck > byAngle / 2)
+			{
+				if (angleToCheck > 0)
+					angleToCheck -= byAngle;
+				else angleToCheck += byAngle;
+			}
+			return angleToCheck;
+		}
+
 		private double DistToQuad(Vector2D[] corners, Vector2D point, out Vector2D closestPoint)
 		{
-			// Checked in incorrect way?
-			double closestDist;
-			closestDist = FindDistanceToSegment(point, corners[0], corners[1], out closestPoint);
-			Vector2D compPoint;
-			double compDist;
+			// Could probably be improved
+			double closestDist = FindDistanceToSegment(point, corners[0], corners[1], out closestPoint);
 
-			compDist = FindDistanceToSegment(point, corners[1], corners[3], out compPoint);
+			double compDist = FindDistanceToSegment(point, corners[1], corners[3], out Vector2D compPoint);
 			if (compDist < closestDist)
 			{
 				closestDist = compDist;
@@ -339,15 +352,6 @@ namespace RacingTest
 			while (!toExit)
 			{
 				// Tyre tracks are done with a low a priority as possible
-				try
-				{
-					Dispatcher.BeginInvoke(new Action(UpdateTyreTracks), System.Windows.Threading.DispatcherPriority.SystemIdle);
-				}
-				catch
-				{
-					continue;
-				}
-
 				Dispatcher.Invoke(() =>
 				{
 					try
@@ -360,12 +364,20 @@ namespace RacingTest
 					}
 					catch { return; }
 					// Labels used for debugging
-					lblPlayerPosition.Content = cars[0].Position;
+					lblPlayerPosition.Content = cars[0].AngleBetweenWheelsAndVelocity;
 					lblSpeed.Content = cars[0].Velocity.Length();
 					lblFrametime.Content = frameRates.Average();
 					lblRotation.Content = cars[0].Rotation;
 
-				});				
+				});
+				try
+				{
+					Dispatcher.BeginInvoke(new Action(UpdateTyreTracks), System.Windows.Threading.DispatcherPriority.SystemIdle);
+				}
+				catch
+				{
+					continue;
+				}
 				Thread.Sleep(7); // Needs tweaking due to performance issues
 			}
 		}
@@ -506,7 +518,7 @@ namespace RacingTest
 			if (e.Key == Key.C)
 			{
 				Vector2D pos = RandomizeVector2InRange(new Vector2D(60, 95), 7, random);
-				Car toAdd = new ComputerCar(pos, Vector2D.Zero, 10, 1500, "Car" + (cars.Count + 2), new SolidColorBrush(Color.FromRgb((byte)random.Next(0, 256), (byte)random.Next(0, 256), (byte)random.Next(0, 256))), baseAims)
+				Car toAdd = new ComputerCar(pos, Vector2D.Zero, 1500, "Car" + (cars.Count + 2), new SolidColorBrush(Color.FromRgb((byte)random.Next(0, 256), (byte)random.Next(0, 256), (byte)random.Next(0, 256))), baseAims)
 				{
 					FrameCount = 0,
 					TrailBrush = Brushes.Black.Clone()
